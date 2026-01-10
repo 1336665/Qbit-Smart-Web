@@ -185,6 +185,79 @@ SITE_PRESETS: Dict[str, dict] = {
         "site_type": SiteType.NEXUSPHP,
         "announce_interval": 1800,
     },
+    # CHDBits
+    "chdbits.co": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    "www.chdbits.co": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    # HDChina
+    "hdchina.org": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    "www.hdchina.org": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    # TTG
+    "totheglory.im": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    # KeepFRDS
+    "keepfrds.com": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    "www.keepfrds.com": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    # PTHome
+    "pthome.net": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    "www.pthome.net": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    # HDHome
+    "hdhome.org": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    "www.hdhome.org": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    # LemonHD（常见别名域名）
+    "lemonhd.org": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    "www.lemonhd.org": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    # BTSchool
+    "pt.btschool.club": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    "btschool.club": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
+    # BYRPT
+    "byr.pt": {
+        "site_type": SiteType.NEXUSPHP,
+        "announce_interval": 1800,
+    },
     # Gazelle站点示例
     "passthepopcorn.me": {
         "site_type": SiteType.GAZELLE,
@@ -247,11 +320,13 @@ class PTSiteHelper:
                 '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             )
             self.cookies = self._parse_cookie(site_config.cookie)
+            self.user_id = self._extract_user_id()
             self.enabled = BS4_AVAILABLE and bool(self.cookies)
         
         # 缓存
         self._tid_cache: Dict[str, TorrentSiteInfo] = {}
         self._cache_max_size = 1000
+        self._user_id_checked = False
     
     def _apply_preset(self):
         """应用站点预设配置"""
@@ -314,6 +389,33 @@ class PTSiteHelper:
                 break
         
         return cookies
+
+    def _extract_user_id(self) -> Optional[int]:
+        if not self.cookies:
+            return None
+        for key in ("c_secure_uid", "uid", "user_id", "userid"):
+            value = self.cookies.get(key)
+            if value and str(value).isdigit():
+                return int(value)
+        return None
+
+    def _resolve_user_id(self) -> Optional[int]:
+        if self._user_id_checked:
+            return self.user_id
+        self._user_id_checked = True
+        if not self.enabled:
+            return self.user_id
+        try:
+            base_url = self._get_base_url()
+            html = self._request(f"{base_url}/index.php")
+            if not html:
+                return self.user_id
+            match = re.search(r'userdetails\.php\?id=(\d+)', html)
+            if match:
+                self.user_id = int(match.group(1))
+        except Exception:
+            pass
+        return self.user_id
     
     def _log(self, level: str, message: str):
         """记录日志"""
@@ -326,6 +428,14 @@ class PTSiteHelper:
         if not url.startswith('http'):
             url = 'https://' + url
         return url
+
+    def _get_site_host(self) -> str:
+        """获取站点域名"""
+        return urlparse(self._get_base_url()).netloc.lower()
+
+    def _is_u2_site(self) -> bool:
+        """判断是否为U2站点"""
+        return "u2.dmhy.org" in self._get_site_host()
     
     def _request(self, url: str, timeout: int = 15) -> Optional[str]:
         """发送HTTP请求"""
@@ -369,10 +479,48 @@ class PTSiteHelper:
         """更新Cookie"""
         self.config.cookie = cookie
         self.cookies = self._parse_cookie(cookie) if cookie else {}
+        self.user_id = self._extract_user_id()
+        self._user_id_checked = False
         self.enabled = bool(self.cookies) and BS4_AVAILABLE and REQUESTS_AVAILABLE
         self._cookie_valid = False
         self._last_cookie_check = 0
         self._log('info', "Cookie已更新")
+
+    @staticmethod
+    def _parse_idle_seconds(text: str) -> Optional[int]:
+        text = (text or '').strip()
+        if not text:
+            return None
+        if text in {"刚刚", "just now", "now"}:
+            return 0
+        if re.match(r'^\d{1,2}:\d{2}(:\d{2})?$', text):
+            parts = list(map(int, text.split(':')))
+            return reduce(lambda a, b: a * 60 + b, parts)
+
+        total = 0
+        matched = False
+        patterns = [
+            (r'(\d+)\s*天', 86400),
+            (r'(\d+)\s*(小时|时|h|hr|hrs)', 3600),
+            (r'(\d+)\s*(分钟|分|m|min|mins)', 60),
+            (r'(\d+)\s*(秒|s|sec|secs)', 1),
+        ]
+        for pattern, multiplier in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                matched = True
+                total += int(match.group(1)) * multiplier
+        return total if matched else None
+
+    @staticmethod
+    def _parse_reannounce_seconds(text: str) -> Optional[int]:
+        text = (text or '').strip()
+        if not text:
+            return None
+        indicators = ['后', '剩余', 'next', 'left', 'remaining', 'reannounce']
+        if not any(key in text.lower() for key in indicators):
+            return None
+        return PTSiteHelper._parse_idle_seconds(text)
     
     # ═══════════════════════════════════════════════════════════════════════════
     # Cookie检测
@@ -450,6 +598,8 @@ class PTSiteHelper:
                 if indicator in html_lower:
                     self._cookie_valid = True
                     self._last_cookie_check = time.time()
+                    if self.user_id is None:
+                        self._resolve_user_id()
                     return True, "Cookie有效"
 
             # 中文登录状态特征
@@ -458,6 +608,8 @@ class PTSiteHelper:
                 if indicator in html:
                     self._cookie_valid = True
                     self._last_cookie_check = time.time()
+                    if self.user_id is None:
+                        self._resolve_user_id()
                     return True, "Cookie有效"
 
             self._cookie_valid = False
@@ -693,65 +845,158 @@ class PTSiteHelper:
             
             with self._lock:
                 soup = BeautifulSoup(html.replace('\n', ' '), 'lxml')
-                result = {}
-                
-                # NexusPHP peer list解析
-                tables = soup.find_all('table')
-                
-                for table in tables or []:
-                    rows = table.find_all('tr')
-                    for tr in rows:
-                        # 查找数据行（有背景色或class标识）
-                        bgcolor = tr.get('bgcolor')
-                        tr_class = tr.get('class', [])
-                        
-                        # 跳过表头
-                        if tr.find('th'):
-                            continue
-                        
-                        tds = tr.find_all('td')
-                        if len(tds) < 2:
-                            continue
-                        
-                        # 获取上传量（通常在第2列附近）
-                        try:
-                            for i, td in enumerate(tds[:5]):
-                                text = td.get_text(' ').strip()
-                                # 匹配大小格式
-                                if re.match(r'[\d,.]+\s*(B|KB|KiB|MB|MiB|GB|GiB|TB|TiB)', text):
-                                    result['uploaded'] = self._parse_size(text)
-                                    break
-                        except:
-                            pass
-                        
-                        # 获取空闲时间（通常在后面的列，格式 HH:MM:SS 或 MM:SS）
-                        try:
-                            for i, td in enumerate(tds[-5:]):
-                                text = td.get_text(' ').strip()
-                                # 匹配时间格式
-                                if re.match(r'^\d{1,2}:\d{2}(:\d{2})?$', text):
-                                    parts = list(map(int, text.split(':')))
-                                    idle_seconds = reduce(lambda a, b: a * 60 + b, parts)
-                                    result['idle_seconds'] = idle_seconds
-                                    result['last_announce'] = time.time() - idle_seconds
-                                    
-                                    # 估算下次汇报时间
-                                    announce_interval = self.config.announce_interval
-                                    result['reannounce_in'] = max(0, announce_interval - idle_seconds)
-                                    break
-                        except Exception as e:
-                            self._log('debug', f"解析空闲时间失败: {e}")
-                        
-                        if result:
+                candidates = self._collect_peerlist_candidates(soup)
+
+                if not candidates:
+                    return None
+
+                if self.user_id is None:
+                    self._resolve_user_id()
+
+                selected = None
+                if self.user_id:
+                    for candidate in candidates:
+                        if candidate['user_id'] == self.user_id:
+                            selected = candidate
                             break
-                    if result:
-                        break
-                
-                return result if result else None
+                if not selected:
+                    selected = candidates[0]
+
+                announce_interval = self.config.announce_interval or 1800
+                idle_seconds = selected['idle_seconds']
+                reannounce_in = selected.get('reannounce_in')
+                if reannounce_in is None:
+                    reannounce_in = max(0, announce_interval - idle_seconds)
+                result = {
+                    'uploaded': selected.get('uploaded'),
+                    'idle_seconds': idle_seconds,
+                    'last_announce': time.time() - idle_seconds,
+                    'reannounce_in': reannounce_in,
+                }
+
+                return result
                 
         except Exception as e:
             self._log('debug', f"获取PeerList失败: {e}")
             return None
+
+    def _collect_peerlist_candidates(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
+        """解析peer list候选行"""
+        if self._is_u2_site():
+            return self._parse_u2_peerlist_candidates(soup)
+        return self._parse_nexus_peerlist_candidates(soup)
+
+    def _parse_u2_peerlist_candidates(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
+        """解析U2 peer list候选行（固定列位置）"""
+        candidates = []
+        tables = soup.find_all('table')
+        for table in tables or []:
+            rows = table.find_all('tr')
+            for tr in rows:
+                if not tr.get('bgcolor'):
+                    continue
+                if tr.find('th'):
+                    continue
+
+                tds = tr.find_all('td')
+                if len(tds) <= 10:
+                    continue
+
+                row_user_id = None
+                try:
+                    for a_tag in tr.find_all('a', href=True):
+                        match = re.search(r'userdetails\.php\?id=(\d+)', a_tag.get('href', ''))
+                        if match:
+                            row_user_id = int(match.group(1))
+                            break
+                except Exception:
+                    row_user_id = None
+
+                uploaded = None
+                try:
+                    uploaded_str = tds[1].get_text(' ').strip()
+                    if uploaded_str:
+                        uploaded = self._parse_size(uploaded_str)
+                except Exception:
+                    uploaded = None
+
+                idle_seconds = None
+                try:
+                    idle_text = tds[10].get_text(' ').strip()
+                    idle_seconds = self._parse_idle_seconds(idle_text)
+                except Exception as e:
+                    self._log('debug', f"解析空闲时间失败: {e}")
+
+                if idle_seconds is None:
+                    continue
+
+                candidates.append({
+                    'user_id': row_user_id,
+                    'uploaded': uploaded,
+                    'idle_seconds': idle_seconds,
+                    'reannounce_in': None,
+                })
+        return candidates
+
+    def _parse_nexus_peerlist_candidates(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
+        """解析NexusPHP peer list候选行"""
+        candidates = []
+        tables = soup.find_all('table')
+
+        for table in tables or []:
+            rows = table.find_all('tr')
+            for tr in rows:
+                # 跳过表头
+                if tr.find('th'):
+                    continue
+
+                tds = tr.find_all('td')
+                if len(tds) < 2:
+                    continue
+
+                row_user_id = None
+                try:
+                    for a_tag in tr.find_all('a', href=True):
+                        match = re.search(r'userdetails\.php\?id=(\d+)', a_tag.get('href', ''))
+                        if match:
+                            row_user_id = int(match.group(1))
+                            break
+                except Exception:
+                    row_user_id = None
+
+                uploaded = None
+                try:
+                    for td in tds[:6]:
+                        text = td.get_text(' ').strip()
+                        if re.match(r'[\d,.]+\s*(B|KB|KiB|MB|MiB|GB|GiB|TB|TiB)', text):
+                            uploaded = self._parse_size(text)
+                            break
+                except Exception:
+                    uploaded = None
+
+                idle_seconds = None
+                reannounce_override = None
+                try:
+                    for td in tds[-6:]:
+                        text = td.get_text(' ').strip()
+                        if reannounce_override is None:
+                            reannounce_override = self._parse_reannounce_seconds(text)
+                        idle_seconds = self._parse_idle_seconds(text)
+                        if idle_seconds is not None:
+                            break
+                except Exception as e:
+                    self._log('debug', f"解析空闲时间失败: {e}")
+
+                if idle_seconds is None:
+                    continue
+
+                candidates.append({
+                    'user_id': row_user_id,
+                    'uploaded': uploaded,
+                    'idle_seconds': idle_seconds,
+                    'reannounce_in': reannounce_override,
+                })
+        return candidates
     
     @staticmethod
     def _parse_size(size_str: str) -> int:

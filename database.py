@@ -13,6 +13,7 @@ import json
 import time
 import hashlib
 import os
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from contextlib import contextmanager
 
@@ -214,12 +215,17 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     level TEXT NOT NULL,
                     message TEXT NOT NULL,
+                    category TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
 
             self._ensure_columns(cursor, 'pt_sites', {
                 'preferred_instance_id': 'INTEGER'
+            })
+
+            self._ensure_columns(cursor, 'logs', {
+                'category': 'TEXT'
             })
             
             # 用户表
@@ -244,6 +250,18 @@ class Database:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+
+            # 运行时配置表（用于Telegram/脚本兼容的临时或覆盖配置）
+            # 说明：
+            # - 与 config 表分离，避免覆盖 Web UI 的持久化配置
+            # - 典型用途：Telegram /config 命令保存 override_host / override_username 等
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS runtime_config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at REAL
+                )
+            ''')
             
             # 种子限速状态表（用于重启后恢复）
             cursor.execute('''
@@ -258,13 +276,42 @@ class Database:
                     cycle_start REAL DEFAULT 0,
                     cycle_uploaded_start INTEGER DEFAULT 0,
                     cycle_synced INTEGER DEFAULT 0,
+                    cycle_interval REAL DEFAULT 0,
+                    jump_count INTEGER DEFAULT 0,
+                    last_jump REAL DEFAULT 0,
+                    prev_time_left REAL DEFAULT 0,
                     target_speed INTEGER DEFAULT 0,
                     last_limit INTEGER DEFAULT -1,
+                    last_dl_limit INTEGER DEFAULT -1,
                     reannounce_time REAL DEFAULT 0,
                     cached_time_left REAL DEFAULT 1800,
+                    last_reannounce REAL DEFAULT 0,
+                    waiting_reannounce INTEGER DEFAULT 0,
+                    reannounced_this_cycle INTEGER DEFAULT 0,
+                    dl_limited_this_cycle INTEGER DEFAULT 0,
+                    session_start_time REAL DEFAULT 0,
+                    total_uploaded_start INTEGER DEFAULT 0,
+                    total_size INTEGER DEFAULT 0,
                     updated_at REAL
                 )
             ''')
+
+            # 兼容升级：确保 torrent_limit_states 表包含新增字段（必须在表创建之后执行）
+            self._ensure_columns(cursor, 'torrent_limit_states', {
+                'cycle_interval': 'REAL DEFAULT 0',
+                'jump_count': 'INTEGER DEFAULT 0',
+                'last_jump': 'REAL DEFAULT 0',
+                'prev_time_left': 'REAL DEFAULT 0',
+                'last_dl_limit': 'INTEGER DEFAULT -1',
+                'last_reannounce': 'REAL DEFAULT 0',
+                'waiting_reannounce': 'INTEGER DEFAULT 0',
+                'reannounced_this_cycle': 'INTEGER DEFAULT 0',
+                'dl_limited_this_cycle': 'INTEGER DEFAULT 0',
+                'session_start_time': 'REAL DEFAULT 0',
+                'total_uploaded_start': 'INTEGER DEFAULT 0',
+                'total_size': 'INTEGER DEFAULT 0',
+            })
+
             
             # 限速统计表
             cursor.execute('''
@@ -282,6 +329,20 @@ class Database:
             # 初始化限速统计
             cursor.execute('INSERT OR IGNORE INTO limit_stats (id, start_time, updated_at) VALUES (1, ?, ?)', 
                           (time.time(), time.time()))
+
+            # 限速历史记录表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS limit_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    torrent_hash TEXT,
+                    torrent_name TEXT,
+                    instance_id INTEGER,
+                    instance_name TEXT,
+                    limit_value INTEGER,
+                    reason TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
             
             # 初始化统计
             cursor.execute('INSERT OR IGNORE INTO stats (id) VALUES (1)')
@@ -693,20 +754,42 @@ class Database:
     # ════════════════════════════════════════════════════════════════════
     # 日志管理
     # ════════════════════════════════════════════════════════════════════
-    def add_log(self, level: str, message: str):
+    def add_log(self, level: str, message: str, category: str = None):
         """添加日志"""
+        if not category:
+            if '[RSS]' in message:
+                category = 'rss'
+            elif '[删种]' in message or '删除种子' in message or '自动删种' in message:
+                category = 'remove'
+            elif '[LimitEngine]' in message or '限速' in message:
+                category = 'limit'
+            else:
+                category = 'general'
         with self.get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO logs (level, message) VALUES (?, ?)
-            ''', (level, message))
+                INSERT INTO logs (level, message, category) VALUES (?, ?, ?)
+            ''', (level, message, category))
             conn.commit()
-    
-    def get_logs(self, limit: int = 100, level: str = None) -> List[Dict]:
+
+    def get_logs(self, limit: int = 100, level: str = None, category: str = None) -> List[Dict]:
         """获取日志"""
         with self.get_conn() as conn:
             cursor = conn.cursor()
-            if level:
+            if category:
+                if category == 'general':
+                    cursor.execute('''
+                        SELECT * FROM logs 
+                        WHERE (category = ? OR category IS NULL)
+                        ORDER BY created_at DESC LIMIT ?
+                    ''', (category, limit))
+                else:
+                    cursor.execute('''
+                        SELECT * FROM logs 
+                        WHERE category = ?
+                        ORDER BY created_at DESC LIMIT ?
+                    ''', (category, limit))
+            elif level:
                 cursor.execute('''
                     SELECT * FROM logs WHERE level = ?
                     ORDER BY created_at DESC LIMIT ?
@@ -715,7 +798,42 @@ class Database:
                 cursor.execute('''
                     SELECT * FROM logs ORDER BY created_at DESC LIMIT ?
                 ''', (limit,))
-            return [dict(row) for row in cursor.fetchall()]
+            results = []
+            for row in cursor.fetchall():
+                item = dict(row)
+                category_value = item.get('category') or 'general'
+                if category == 'general' and item.get('category') is None:
+                    if '[RSS]' in item['message'] or '[删种]' in item['message'] or '[LimitEngine]' in item['message']:
+                        continue
+                    if '删除种子' in item['message'] or '自动删种' in item['message']:
+                        continue
+                item['category'] = category_value
+                item['time'] = self._format_log_time(item.get('created_at'))
+                results.append(item)
+            return results
+
+    @staticmethod
+    def _format_log_time(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(value).strftime('%Y-%m-%d %H:%M:%S')
+        if isinstance(value, str):
+            for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f'):
+                try:
+                    dt = datetime.strptime(value, fmt)
+                    dt = dt.replace(tzinfo=timezone.utc).astimezone()
+                    return dt.strftime('%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    continue
+            try:
+                dt = datetime.fromisoformat(value)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                return value
+        return str(value)
     
     def clear_logs(self, days: int = 7):
         """清理旧日志"""
@@ -726,6 +844,27 @@ class Database:
                 WHERE created_at < datetime('now', '-' || ? || ' days')
             ''', (days,))
             conn.commit()
+
+    def add_limit_history(self, torrent_hash: str, torrent_name: str, instance_id: int,
+                          instance_name: str, limit_value: int, reason: str):
+        """添加限速历史"""
+        with self.get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO limit_history
+                (torrent_hash, torrent_name, instance_id, instance_name, limit_value, reason)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (torrent_hash, torrent_name, instance_id, instance_name, limit_value, reason))
+            conn.commit()
+
+    def get_limit_history(self, limit: int = 50) -> List[Dict]:
+        """获取限速历史"""
+        with self.get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM limit_history ORDER BY created_at DESC LIMIT ?
+            ''', (limit,))
+            return [dict(row) for row in cursor.fetchall()]
     
     # ════════════════════════════════════════════════════════════════════
     # 统计管理
@@ -808,9 +947,11 @@ class Database:
             cursor.execute('''
                 INSERT OR REPLACE INTO torrent_limit_states 
                 (hash, name, tracker, instance_id, site_id, tid, cycle_index, cycle_start,
-                 cycle_uploaded_start, cycle_synced, target_speed, last_limit, 
-                 reannounce_time, cached_time_left, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 cycle_uploaded_start, cycle_synced, cycle_interval, jump_count, last_jump,
+                 prev_time_left, target_speed, last_limit, last_dl_limit, reannounce_time,
+                 cached_time_left, last_reannounce, waiting_reannounce, reannounced_this_cycle,
+                 dl_limited_this_cycle, session_start_time, total_uploaded_start, total_size, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 state.get('hash'),
                 state.get('name', ''),
@@ -822,10 +963,22 @@ class Database:
                 state.get('cycle_start', 0),
                 state.get('cycle_uploaded_start', 0),
                 1 if state.get('cycle_synced') else 0,
+                state.get('cycle_interval', 0),
+                state.get('jump_count', 0),
+                state.get('last_jump', 0),
+                state.get('prev_time_left', 0),
                 state.get('target_speed', 0),
                 state.get('last_limit', -1),
+                state.get('last_dl_limit', -1),
                 state.get('reannounce_time', 0),
                 state.get('cached_time_left', 1800),
+                state.get('last_reannounce', 0),
+                1 if state.get('waiting_reannounce') else 0,
+                1 if state.get('reannounced_this_cycle') else 0,
+                1 if state.get('dl_limited_this_cycle') else 0,
+                state.get('session_start_time', 0),
+                state.get('total_uploaded_start', 0),
+                state.get('total_size', 0),
                 time.time()
             ))
             conn.commit()
@@ -849,10 +1002,22 @@ class Database:
                 'cycle_start': row['cycle_start'],
                 'cycle_uploaded_start': row['cycle_uploaded_start'],
                 'cycle_synced': bool(row['cycle_synced']),
+                'cycle_interval': row['cycle_interval'],
+                'jump_count': row['jump_count'],
+                'last_jump': row['last_jump'],
+                'prev_time_left': row['prev_time_left'],
                 'target_speed': row['target_speed'],
                 'last_limit': row['last_limit'],
+                'last_dl_limit': row['last_dl_limit'],
                 'reannounce_time': row['reannounce_time'],
                 'cached_time_left': row['cached_time_left'],
+                'last_reannounce': row['last_reannounce'],
+                'waiting_reannounce': bool(row['waiting_reannounce']),
+                'reannounced_this_cycle': bool(row['reannounced_this_cycle']),
+                'dl_limited_this_cycle': bool(row['dl_limited_this_cycle']),
+                'session_start_time': row['session_start_time'],
+                'total_uploaded_start': row['total_uploaded_start'],
+                'total_size': row['total_size'],
                 'updated_at': row['updated_at']
             }
     
@@ -912,6 +1077,27 @@ class Database:
                 WHERE id = 1
             ''', (cycles, success, precision, uploaded, time.time()))
             conn.commit()
+
+    # ════════════════════════════════════════════════════════════════════
+    # 运行时配置（兼容 main.py / Telegram 指令）
+    # ════════════════════════════════════════════════════════════════════
+    def save_runtime_config(self, key: str, value: Any):
+        """保存运行时配置（覆盖项）"""
+        with self.get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'INSERT OR REPLACE INTO runtime_config (key, value, updated_at) VALUES (?, ?, ?)',
+                (key, str(value), time.time())
+            )
+            conn.commit()
+
+    def get_runtime_config(self, key: str) -> Optional[str]:
+        """获取运行时配置"""
+        with self.get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT value FROM runtime_config WHERE key = ?', (key,))
+            row = cursor.fetchone()
+            return row['value'] if row else None
 
 
 # 全局数据库实例

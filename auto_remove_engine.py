@@ -289,10 +289,8 @@ class AutoRemoveEngine:
             
             if self.notifier:
                 try:
-                    self.notifier.notify(
-                        title="🗑️ 自动删种",
-                        message=f"📦 {torrent_name[:40]}\n📏 {self._fmt_size(size)}\n📊 分享率: {ratio:.2f}\n📋 规则: {rule['name']}"
-                    )
+                    reason = f"{self._fmt_size(size)} | 分享率 {ratio:.2f} | 规则 {rule['name']}"
+                    self.notifier.notify_torrent_removed(torrent_name, reason)
                 except:
                     pass
         else:

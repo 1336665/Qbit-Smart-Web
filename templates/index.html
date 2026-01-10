@@ -9,11 +9,13 @@
         
         :root {
             --bg-primary: #0a0e17;
-            --bg-secondary: #111827;
-            --bg-tertiary: #1a2234;
-            --bg-card: linear-gradient(145deg, #151d2e 0%, #0f1621 100%);
-            --border-color: rgba(56, 189, 248, 0.15);
-            --border-glow: rgba(56, 189, 248, 0.3);
+            --bg-secondary: rgba(17, 24, 39, 0.9);
+            --bg-tertiary: rgba(26, 34, 52, 0.9);
+            --bg-card: linear-gradient(145deg, rgba(21, 29, 46, 0.92) 0%, rgba(15, 22, 33, 0.86) 100%);
+            --bg-surface: rgba(15, 23, 42, 0.7);
+            --border-color: rgba(56, 189, 248, 0.18);
+            --border-glow: rgba(56, 189, 248, 0.35);
+            --border-soft: rgba(148, 163, 184, 0.12);
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
@@ -28,6 +30,11 @@
             --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(56, 189, 248, 0.15) 0%, transparent 70%);
             --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
             --shadow-glow: 0 0 40px rgba(34, 211, 238, 0.15);
+            --shadow-soft: 0 12px 24px -18px rgba(15, 23, 42, 0.8);
+            --radius-xl: 20px;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --transition-base: 0.2s ease;
         }
 
         * {
@@ -62,6 +69,22 @@
             right: 0;
             height: 100vh;
             background: var(--gradient-glow);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.08), transparent 45%),
+                radial-gradient(circle at 80% 0%, rgba(168, 85, 247, 0.08), transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(34, 211, 238, 0.05), transparent 40%),
+                linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+            background-size: auto, auto, auto, 36px 36px, 36px 36px;
+            opacity: 0.4;
             pointer-events: none;
             z-index: 0;
         }
@@ -152,7 +175,7 @@
         /* Sidebar */
         .sidebar {
             width: 260px;
-            background: var(--bg-secondary);
+            background: linear-gradient(180deg, rgba(17, 24, 39, 0.95) 0%, rgba(10, 14, 23, 0.95) 100%);
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
@@ -230,12 +253,13 @@
             align-items: center;
             gap: 0.75rem;
             padding: 0.75rem 1rem;
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             color: var(--text-secondary);
             text-decoration: none;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all var(--transition-base);
             margin-bottom: 2px;
+            border: 1px solid transparent;
         }
 
         .nav-item:hover {
@@ -244,9 +268,15 @@
         }
 
         .nav-item.active {
-            background: rgba(34, 211, 238, 0.15);
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(59, 130, 246, 0.12));
             color: var(--accent-cyan);
-            border: 1px solid rgba(34, 211, 238, 0.2);
+            border: 1px solid rgba(34, 211, 238, 0.35);
+            box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.08);
+        }
+
+        .nav-item:focus-visible {
+            outline: 2px solid rgba(34, 211, 238, 0.5);
+            outline-offset: 2px;
         }
 
         .nav-item-icon {
@@ -281,7 +311,7 @@
 
         /* Header */
         .header {
-            background: rgba(17, 24, 39, 0.8);
+            background: linear-gradient(180deg, rgba(17, 24, 39, 0.9) 0%, rgba(10, 14, 23, 0.85) 100%);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border-color);
             padding: 1rem 1.5rem;
@@ -296,6 +326,7 @@
         .header-title {
             font-size: 1.25rem;
             font-weight: 600;
+            letter-spacing: 0.01em;
         }
 
         .header-actions {
@@ -402,11 +433,12 @@
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 16px;
+            border-radius: var(--radius-lg);
             padding: 1.5rem;
             margin-bottom: 1.5rem;
-            box-shadow: var(--shadow-lg);
+            box-shadow: var(--shadow-lg), var(--shadow-soft);
             transition: all 0.3s ease;
+            backdrop-filter: blur(12px);
         }
 
         .card:hover {
@@ -444,11 +476,12 @@
         .stat-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 16px;
+            border-radius: var(--radius-lg);
             padding: 1.25rem;
             position: relative;
             overflow: hidden;
             transition: all 0.3s ease;
+            backdrop-filter: blur(12px);
         }
 
         .stat-card::before {
@@ -505,8 +538,10 @@
         /* Tables */
         .table-container {
             overflow-x: auto;
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-soft);
+            background: var(--bg-surface);
+            backdrop-filter: blur(10px);
         }
 
         table {
@@ -545,18 +580,23 @@
             justify-content: center;
             gap: 0.5rem;
             padding: 0.625rem 1.25rem;
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             font-size: 0.875rem;
             font-weight: 500;
             cursor: pointer;
             border: none;
-            transition: all 0.2s ease;
+            transition: all var(--transition-base);
             font-family: inherit;
             min-width: fit-content;
             white-space: nowrap;
             /* 防止在flex容器中被拉伸 */
             flex-shrink: 0;
             flex-grow: 0;
+        }
+
+        .btn:focus-visible {
+            outline: 2px solid rgba(34, 211, 238, 0.6);
+            outline-offset: 2px;
         }
         
         .btn:disabled {
@@ -654,13 +694,14 @@
         .form-input {
             width: 100%;
             padding: 0.75rem 1rem;
-            background: var(--bg-primary);
+            background: rgba(10, 14, 23, 0.7);
             border: 1px solid var(--border-color);
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             color: var(--text-primary);
             font-size: 0.875rem;
             font-family: inherit;
-            transition: all 0.2s ease;
+            transition: all var(--transition-base);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
         }
 
         .form-input:focus {
@@ -680,6 +721,24 @@
             background-repeat: no-repeat;
             background-position: right 1rem center;
             padding-right: 2.5rem;
+        }
+
+        .notify-policy {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .notify-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .notify-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            line-height: 1.4;
+            color: var(--text-primary);
         }
 
         /* Switch Toggle */
@@ -1006,6 +1065,10 @@
             overflow-y: auto;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.75rem;
+        }
+
+        .log-container.compact {
+            max-height: 260px;
         }
 
         .log-item {
@@ -1713,6 +1776,61 @@
                             </div>
                         </div>
                     </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <span class="card-title-icon">📡</span>
+                                RSS记录
+                            </h3>
+                        </div>
+                        <div class="log-container compact" id="logs-rss-container">
+                            <div class="loading">
+                                <div class="loading-spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <span class="card-title-icon">🧹</span>
+                                删种记录
+                            </h3>
+                        </div>
+                        <div class="log-container compact" id="logs-remove-container">
+                            <div class="loading">
+                                <div class="loading-spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <span class="card-title-icon">🚦</span>
+                                限速记录
+                            </h3>
+                        </div>
+                        <div class="log-container compact" id="logs-limit-container">
+                            <div class="loading">
+                                <div class="loading-spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <span class="card-title-icon">📈</span>
+                                限速历史
+                            </h3>
+                            <button class="btn btn-secondary btn-sm" onclick="loadLimitHistory()">
+                                🔄 刷新
+                            </button>
+                        </div>
+                        <div class="table-container" id="limit-history-container">
+                            <div class="loading">
+                                <div class="loading-spinner"></div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
                 
                 <!-- Settings Page -->
@@ -1733,6 +1851,47 @@
                         <div class="form-group">
                             <label class="form-label">Telegram Chat ID</label>
                             <input type="text" class="form-input" id="config-tg-chatid" placeholder="输入Chat ID">
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1rem;">
+                            <label class="form-label" style="margin-bottom: 0.75rem;">通知策略</label>
+                            <div class="notify-policy">
+                                <div class="notify-row">
+                                    <span class="notify-label">启动通知</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="config-notify-startup">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="notify-row">
+                                    <span class="notify-label">RSS/添加种子通知</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="config-notify-add">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="notify-row">
+                                    <span class="notify-label">删种通知</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="config-notify-remove">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="notify-row">
+                                    <span class="notify-label">限速通知</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="config-notify-limit">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="notify-row">
+                                    <span class="notify-label">错误通知</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="config-notify-error">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="form-group" style="display: flex; align-items: center; justify-content: space-between;">
@@ -2137,7 +2296,12 @@
                 <button class="modal-close" onclick="closeModal('site-details-modal')">✕</button>
             </div>
             <div class="modal-body" id="site-details-content">
-                <div class="loading-spinner">加载中...</div>
+                <div class="loading">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
+                        <div class="loading-spinner"></div>
+                        <div style="color: var(--text-muted); font-size: 0.85rem;">加载中...</div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-info" onclick="checkSiteCookie()">🔍 检测Cookie</button>
@@ -2353,6 +2517,32 @@
                 throw error;
             }
         }
+
+        // 不走2秒缓存的API（用于实时可视化/轮询）
+        async function apiNoCache(endpoint, options = {}) {
+            const url = `/api${endpoint}`;
+            const { signal, ...restOptions } = options;
+            const config = {
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                cache: 'no-store',
+                ...restOptions,
+            };
+            if (signal) config.signal = signal;
+            if (config.body && typeof config.body === 'object') {
+                config.body = JSON.stringify(config.body);
+            }
+            const response = await fetch(url, config);
+            const data = await response.json();
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return null;
+            }
+            if (!response.ok) {
+                throw new Error(data.error || '请求失败');
+            }
+            return data;
+        }
         
         // 清除缓存
         function clearApiCache(prefix = null) {
@@ -2402,7 +2592,12 @@
         }
 
         function closeModal(id) {
-            document.getElementById(id).classList.remove('active');
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active');
+            // 停止可视化轮询
+            if (id === 'torrent-viz-modal') {
+                stopTorrentViz();
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -2420,6 +2615,7 @@
         }
 
         function formatSpeed(bytes) {
+            if (bytes === null || bytes === undefined) return '0 B/s';
             if (bytes === 0) return '0 B/s';
             const units = ['B/s', 'KiB/s', 'MiB/s', 'GiB/s'];
             let i = 0;
@@ -2428,6 +2624,27 @@
                 i++;
             }
             return bytes.toFixed(1) + ' ' + units[i];
+        }
+
+        // 限速显示（处理 -1=无限制, -2=未初始化/未知）
+        function formatLimit(limit, qbLimit = null) {
+            const v = limit === null || limit === undefined ? NaN : Number(limit);
+            const q = qbLimit === null || qbLimit === undefined ? NaN : Number(qbLimit);
+            const hasQ = !Number.isNaN(q) && q > 0;
+            const hasQUnlimited = !Number.isNaN(q) && q <= 0;
+
+            if (v === -1) return '无限制';
+            if (Number.isNaN(v) || v === -2 || v < -1) {
+                if (hasQ) return formatSpeed(q);
+                if (hasQUnlimited) return '无限制';
+                return '未知';
+            }
+            if (v < 0) {
+                if (hasQ) return formatSpeed(q);
+                if (hasQUnlimited) return '无限制';
+                return '未知';
+            }
+            return formatSpeed(v);
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -2909,7 +3126,8 @@
                             <div class="torrent-header">
                                 <div class="torrent-name" style="cursor: pointer;" onclick="showTorrentDetail('${t.hash}', ${instanceId})">${t.name}</div>
                                 <div>
-                                    <button class="btn btn-info btn-sm" onclick="showTorrentDetail('${t.hash}', ${instanceId})" title="查看详情">📊</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="showTorrentDetail('${t.hash}', ${instanceId})" title="查看详情">📊</button>
+                                    <button class="btn btn-primary btn-sm" onclick="showTorrentVisual('${t.hash}', ${instanceId})" title="可视化">📈</button>
                                     <button class="btn btn-secondary btn-sm" onclick="reannounce(${instanceId}, '${t.hash}')" title="强制汇报">🔄</button>
                                     <button class="btn btn-danger btn-sm" onclick="deleteTorrent(${instanceId}, '${t.hash}')" title="删除">🗑️</button>
                                 </div>
@@ -2991,7 +3209,7 @@
                                 </div>
                                 <div>
                                     <div style="color: var(--text-muted);">汇报倒计时</div>
-                                    <div style="font-weight: 500; color: var(--accent-cyan);">${formatTime(state.time_left || 0)}</div>
+                                    <div style="font-weight: 500; color: var(--accent-cyan);">${state.time_left_valid ? formatTime(state.time_left_raw) : '未知'}</div>
                                 </div>
                                 <div>
                                     <div style="color: var(--text-muted);">周期已过</div>
@@ -3060,7 +3278,7 @@
                                 <div>
                                     <div style="color: var(--text-muted);">当前限制</div>
                                     <div style="font-weight: 500; color: var(--accent-purple);">
-                                        ${state.last_limit === -1 ? '无限制' : formatSpeed(state.last_limit || 0)}
+                                        ${formatLimit(state.last_limit, state.qb_up_limit)}
                                     </div>
                                 </div>
                             </div>
@@ -3071,7 +3289,8 @@
                         </div>
                         
                         <!-- 操作按钮 -->
-                        <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+                        <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap;">
+                            <button class="btn btn-primary" onclick="showTorrentVisual('${hash}', ${instanceId})">📈 可视化</button>
                             <button class="btn btn-secondary" onclick="reannounce(${instanceId}, '${hash}'); closeModal('torrent-detail-modal');">🔄 强制汇报</button>
                             <button class="btn btn-danger" onclick="deleteTorrent(${instanceId}, '${hash}'); closeModal('torrent-detail-modal');">🗑️ 删除种子</button>
                         </div>
@@ -3108,6 +3327,325 @@
                 document.body.appendChild(modal);
             }
             modal.classList.add('active');
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // Torrent Visualization (Real-time)
+        // ═══════════════════════════════════════════════════════════════════
+        let _torrentViz = {
+            timer: null,
+            running: false,
+            hash: null,
+            instanceId: null,
+            windowSeconds: 300,
+            points: [],
+            canvas: null,
+            resizeHandler: null,
+        };
+
+        function stopTorrentViz() {
+            if (_torrentViz.timer) {
+                clearInterval(_torrentViz.timer);
+                _torrentViz.timer = null;
+            }
+            if (_torrentViz.resizeHandler) {
+                window.removeEventListener('resize', _torrentViz.resizeHandler);
+                _torrentViz.resizeHandler = null;
+            }
+            _torrentViz.running = false;
+            _torrentViz.hash = null;
+            _torrentViz.instanceId = null;
+            _torrentViz.points = [];
+            _torrentViz.canvas = null;
+        }
+
+        async function showTorrentVisual(hash, instanceId) {
+            stopTorrentViz();
+            const content = `
+                <div style="padding: 1.25rem;">
+                    <div id="torrent-viz-title" style="font-weight: 700; margin-bottom: 0.75rem; word-break: break-all;">${hash}</div>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                        <span class="badge badge-info" id="viz-badge-speed">↑ 0 B/s</span>
+                        <span class="badge badge-purple" id="viz-badge-limit">⚡ 未知</span>
+                        <span class="badge badge-success" id="viz-badge-target">🎯 0 B/s</span>
+                        <span class="badge badge-warning" id="viz-badge-phase">⏳ -</span>
+                    </div>
+                    <div style="background: rgba(10, 14, 23, 0.45); border: 1px solid var(--border-color); border-radius: 12px; padding: 0.75rem;">
+                        <canvas id="torrent-viz-canvas" style="width: 100%; height: 220px;"></canvas>
+                        <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+                            <span>Upload Speed</span>
+                            <span>Limit / Target</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" onclick="closeModal('torrent-viz-modal')">关闭</button>
+                    </div>
+                </div>
+            `;
+            showCustomModal('torrent-viz-modal', '📈 可视化', content);
+
+            // 放大一点宽度，适配图表
+            const modal = document.getElementById('torrent-viz-modal');
+            if (modal) {
+                const mc = modal.querySelector('.modal-content');
+                if (mc) mc.style.maxWidth = '720px';
+            }
+
+            // 等待DOM渲染
+            setTimeout(() => initTorrentViz(hash, instanceId), 0);
+        }
+
+        function _vizGetColor(varName, fallback) {
+            const v = getComputedStyle(document.documentElement).getPropertyValue(varName);
+            return (v && v.trim()) ? v.trim() : fallback;
+        }
+
+        function _resizeVizCanvas() {
+            const canvas = _torrentViz.canvas;
+            if (!canvas) return;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            const cssW = Math.max(320, rect.width);
+            const cssH = Math.max(180, rect.height || 220);
+            canvas.width = Math.floor(cssW * dpr);
+            canvas.height = Math.floor(cssH * dpr);
+        }
+
+        function _drawTorrentViz() {
+            const canvas = _torrentViz.canvas;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // 清空
+            ctx.clearRect(0, 0, w, h);
+
+            const pts = _torrentViz.points;
+            if (!pts || pts.length < 2) {
+                ctx.fillStyle = 'rgba(148, 163, 184, 0.8)';
+                ctx.font = `${14 * dpr}px system-ui, -apple-system, Segoe UI, Roboto`;
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无数据', w / 2, h / 2);
+                return;
+            }
+
+            const nowT = pts[pts.length - 1].t;
+            const tMin = nowT - _torrentViz.windowSeconds;
+            const view = pts.filter(p => p.t >= tMin);
+            if (view.length < 2) return;
+
+            let yMax = 1;
+            for (const p of view) {
+                const up = Number(p.up) || 0;
+                const lim = p.limit === null || p.limit === undefined ? 0 : (Number(p.limit) || 0);
+                const tar = Number(p.target) || 0;
+                // 只统计正值，避免 -1 等
+                yMax = Math.max(yMax, up, lim, tar);
+            }
+            yMax = Math.max(1, yMax * 1.15);
+
+            const padL = 44 * dpr;
+            const padR = 10 * dpr;
+            const padT = 10 * dpr;
+            const padB = 22 * dpr;
+            const plotW = w - padL - padR;
+            const plotH = h - padT - padB;
+
+            const xOf = (t) => padL + (Math.min(1, Math.max(0, (t - tMin) / (_torrentViz.windowSeconds || 1)))) * plotW;
+            const yOf = (v) => padT + (1 - Math.min(1, Math.max(0, v / yMax))) * plotH;
+
+            // Grid
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const yy = padT + (i / 4) * plotH;
+                ctx.beginPath();
+                ctx.moveTo(padL, yy);
+                ctx.lineTo(padL + plotW, yy);
+                ctx.stroke();
+            }
+
+            // Y labels (0 / mid / max)
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.8)';
+            ctx.font = `${11 * dpr}px system-ui, -apple-system, Segoe UI, Roboto`;
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('0', padL - 6 * dpr, padT + plotH);
+            ctx.fillText(formatSpeed(yMax / 2).replace('/s', ''), padL - 6 * dpr, padT + plotH / 2);
+            ctx.fillText(formatSpeed(yMax).replace('/s', ''), padL - 6 * dpr, padT);
+
+            // Target line (dashed)
+            const tarColor = _vizGetColor('--accent-green', '#10b981');
+            const limColor = _vizGetColor('--accent-purple', '#a855f7');
+            const upColor = _vizGetColor('--accent-cyan', '#22d3ee');
+
+            const last = view[view.length - 1];
+            const targetVal = Number(last.target) || 0;
+            if (targetVal > 0) {
+                ctx.save();
+                ctx.setLineDash([6 * dpr, 4 * dpr]);
+                ctx.strokeStyle = tarColor;
+                ctx.lineWidth = 2 * dpr;
+                const yy = yOf(targetVal);
+                ctx.beginPath();
+                ctx.moveTo(padL, yy);
+                ctx.lineTo(padL + plotW, yy);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Limit line (solid)
+            ctx.strokeStyle = limColor;
+            ctx.lineWidth = 2 * dpr;
+            ctx.beginPath();
+            let started = false;
+            for (const p of view) {
+                const lim = p.limit === null || p.limit === undefined ? null : (Number(p.limit) || 0);
+                if (lim === null || lim <= 0) {
+                    started = false;
+                    continue;
+                }
+                const xx = xOf(p.t);
+                const yy = yOf(lim);
+                if (!started) {
+                    ctx.moveTo(xx, yy);
+                    started = true;
+                } else {
+                    ctx.lineTo(xx, yy);
+                }
+            }
+            if (started) ctx.stroke();
+
+            // Upload speed line
+            ctx.strokeStyle = upColor;
+            ctx.lineWidth = 2 * dpr;
+            ctx.beginPath();
+            for (let i = 0; i < view.length; i++) {
+                const p = view[i];
+                const xx = xOf(p.t);
+                const yy = yOf(Number(p.up) || 0);
+                if (i === 0) ctx.moveTo(xx, yy);
+                else ctx.lineTo(xx, yy);
+            }
+            ctx.stroke();
+        }
+
+        async function initTorrentViz(hash, instanceId) {
+            _torrentViz.hash = hash;
+            _torrentViz.instanceId = instanceId;
+            _torrentViz.windowSeconds = 300;
+            _torrentViz.points = [];
+            _torrentViz.canvas = document.getElementById('torrent-viz-canvas');
+
+            if (!_torrentViz.canvas) {
+                showToast('可视化画布未找到', 'error');
+                return;
+            }
+
+            _resizeVizCanvas();
+            _torrentViz.resizeHandler = throttle(() => {
+                _resizeVizCanvas();
+                _drawTorrentViz();
+            }, 200);
+            window.addEventListener('resize', _torrentViz.resizeHandler);
+
+            const titleEl = document.getElementById('torrent-viz-title');
+            const badgeSpeed = document.getElementById('viz-badge-speed');
+            const badgeLimit = document.getElementById('viz-badge-limit');
+            const badgeTarget = document.getElementById('viz-badge-target');
+            const badgePhase = document.getElementById('viz-badge-phase');
+
+            let state = null;
+            try {
+                state = await apiNoCache(`/limit_engine/state/${hash}`);
+            } catch (e) {
+                showToast('获取可视化状态失败: ' + e.message, 'error');
+                return;
+            }
+
+            // 初始化title/徽章
+            if (titleEl) titleEl.textContent = state.name || hash;
+            if (badgeSpeed) badgeSpeed.textContent = `↑ ${formatSpeed(state.current_speed || 0)}`;
+            if (badgeLimit) badgeLimit.textContent = `⚡ ${formatLimit(state.last_limit, state.qb_up_limit)}`;
+            if (badgeTarget) badgeTarget.textContent = `🎯 ${formatSpeed(state.target_speed || 0)}`;
+
+            const phaseMap = {
+                'warmup': { text: '预热期', emoji: '🔥' },
+                'catch': { text: '追赶期', emoji: '⚡' },
+                'steady': { text: '稳定期', emoji: '✅' },
+                'finish': { text: '收尾期', emoji: '🎯' }
+            };
+            const ph = phaseMap[state.phase] || { text: '未知', emoji: '❓' };
+            if (badgePhase) badgePhase.textContent = `${ph.emoji} ${ph.text}`;
+
+            // 获取历史速度样本填充
+            try {
+                const samples = await apiNoCache(`/limit_engine/samples/${hash}?window=${_torrentViz.windowSeconds}`);
+                const limVal = (state.last_limit && state.last_limit > 0) ? state.last_limit : ((state.qb_up_limit && state.qb_up_limit > 0) ? state.qb_up_limit : null);
+                const tarVal = state.target_speed || 0;
+                _torrentViz.points = (samples || []).map(s => ({
+                    t: Number(s.t) || 0,
+                    up: Number(s.up) || 0,
+                    limit: limVal,
+                    target: tarVal,
+                })).filter(p => p.t > 0);
+            } catch (e) {
+                _torrentViz.points = [];
+            }
+
+            // 补一条当前点
+            const nowT = Date.now() / 1000;
+            const limNow = (state.last_limit && state.last_limit > 0) ? state.last_limit : ((state.qb_up_limit && state.qb_up_limit > 0) ? state.qb_up_limit : null);
+            _torrentViz.points.push({
+                t: nowT,
+                up: Number(state.current_speed) || 0,
+                limit: limNow,
+                target: Number(state.target_speed) || 0,
+            });
+
+            _drawTorrentViz();
+
+            // 开始轮询
+            _torrentViz.running = true;
+            let inFlight = false;
+            _torrentViz.timer = setInterval(async () => {
+                if (!_torrentViz.running || inFlight) return;
+                const modal = document.getElementById('torrent-viz-modal');
+                if (!modal || !modal.classList.contains('active')) {
+                    stopTorrentViz();
+                    return;
+                }
+                inFlight = true;
+                try {
+                    const st = await apiNoCache(`/limit_engine/state/${hash}`);
+                    const t = Date.now() / 1000;
+                    const lim = (st.last_limit && st.last_limit > 0) ? st.last_limit : ((st.qb_up_limit && st.qb_up_limit > 0) ? st.qb_up_limit : null);
+                    const tar = st.target_speed || 0;
+                    _torrentViz.points.push({ t, up: Number(st.current_speed) || 0, limit: lim, target: Number(tar) || 0 });
+                    // 裁剪窗口
+                    const cutoff = t - _torrentViz.windowSeconds;
+                    while (_torrentViz.points.length > 2 && _torrentViz.points[0].t < cutoff) {
+                        _torrentViz.points.shift();
+                    }
+
+                    // 更新徽章
+                    if (badgeSpeed) badgeSpeed.textContent = `↑ ${formatSpeed(st.current_speed || 0)}`;
+                    if (badgeLimit) badgeLimit.textContent = `⚡ ${formatLimit(st.last_limit, st.qb_up_limit)}`;
+                    if (badgeTarget) badgeTarget.textContent = `🎯 ${formatSpeed(st.target_speed || 0)}`;
+                    const p = phaseMap[st.phase] || { text: '未知', emoji: '❓' };
+                    if (badgePhase) badgePhase.textContent = `${p.emoji} ${p.text}`;
+
+                    _drawTorrentViz();
+                } catch (e) {
+                    // 暂时忽略单次失败
+                } finally {
+                    inFlight = false;
+                }
+            }, 1000);
         }
 
         async function deleteTorrent(instanceId, hash) {
@@ -3392,7 +3930,14 @@
             showModal('site-details-modal');
             
             const content = document.getElementById('site-details-content');
-            content.innerHTML = '<div class="loading-spinner">加载中...</div>';
+            content.innerHTML = `
+                <div class="loading">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
+                        <div class="loading-spinner"></div>
+                        <div style="color: var(--text-muted); font-size: 0.85rem;">加载中...</div>
+                    </div>
+                </div>
+            `;
             
             try {
                 const controller = new AbortController();
@@ -3806,10 +4351,39 @@
         // ═══════════════════════════════════════════════════════════════════
         async function loadLogs() {
             try {
-                const logs = await api('/logs?limit=100');
+                const [mainLogs, rssLogs, removeLogs, limitLogs] = await Promise.all([
+                    api('/logs?limit=100&category=general'),
+                    api('/logs?limit=50&category=rss'),
+                    api('/logs?limit=50&category=remove'),
+                    api('/logs?limit=50&category=limit')
+                ]);
+
                 const container = document.getElementById('logs-container');
+                const rssContainer = document.getElementById('logs-rss-container');
+                const removeContainer = document.getElementById('logs-remove-container');
+                const limitContainer = document.getElementById('logs-limit-container');
+
+                const renderLogList = (target, list, emptyTitle) => {
+                    if (!target) return;
+                    if (list.length === 0) {
+                        target.innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📜</div>
+                                <div class="empty-state-title">${emptyTitle}</div>
+                            </div>
+                        `;
+                        return;
+                    }
+                    target.innerHTML = list.map(log => `
+                        <div class="log-item">
+                            <span class="log-time">${getLogTime(log)}</span>
+                            <span class="log-level ${log.level}">${log.level}</span>
+                            <span class="log-message">${log.message}</span>
+                        </div>
+                    `).join('');
+                };
                 
-                if (logs.length === 0) {
+                if (mainLogs.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
                             <div class="empty-state-icon">📜</div>
@@ -3817,16 +4391,73 @@
                         </div>
                     `;
                 } else {
-                    container.innerHTML = logs.map(log => `
+                    container.innerHTML = mainLogs.map(log => `
                         <div class="log-item">
-                            <span class="log-time">${log.time}</span>
+                            <span class="log-time">${getLogTime(log)}</span>
                             <span class="log-level ${log.level}">${log.level}</span>
                             <span class="log-message">${log.message}</span>
                         </div>
                     `).join('');
                 }
+
+                renderLogList(rssContainer, rssLogs, '暂无RSS记录');
+                renderLogList(removeContainer, removeLogs, '暂无删种记录');
+                renderLogList(limitContainer, limitLogs, '暂无限速记录');
+                loadLimitHistory();
             } catch (error) {
                 showToast('加载日志失败: ' + error.message, 'error');
+            }
+        }
+
+        function getLogTime(log) {
+            return log.time || log.created_at || '';
+        }
+
+        async function loadLimitHistory() {
+            const container = document.getElementById('limit-history-container');
+            if (!container) return;
+            try {
+                const history = await api('/limit_engine/history?limit=50');
+                if (!history.length) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📈</div>
+                            <div class="empty-state-title">暂无限速历史</div>
+                        </div>
+                    `;
+                    return;
+                }
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>种子</th>
+                                <th>实例</th>
+                                <th>限速</th>
+                                <th>原因</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${history.map(item => `
+                                <tr>
+                                    <td>${item.created_at}</td>
+                                    <td title="${item.torrent_name || ''}">${item.torrent_name || '-'}</td>
+                                    <td>${item.instance_name || '-'}</td>
+                                    <td>${formatLimit(item.limit_value, null)}</td>
+                                    <td>${item.reason || '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <div class="empty-state-title">加载失败</div>
+                    </div>
+                `;
             }
         }
 
@@ -3844,6 +4475,11 @@
                 document.getElementById('config-rss-enabled').checked = config.rss_fetch_enabled === 'true';
                 document.getElementById('config-rss-interval').value = config.rss_fetch_interval || '300';
                 document.getElementById('config-rss-max-age').value = config.rss_max_age_minutes || '60';
+                document.getElementById('config-notify-startup').checked = config.notify_on_startup !== 'false';
+                document.getElementById('config-notify-add').checked = config.notify_on_add !== 'false';
+                document.getElementById('config-notify-remove').checked = config.notify_on_remove !== 'false';
+                document.getElementById('config-notify-limit').checked = config.notify_on_limit !== 'false';
+                document.getElementById('config-notify-error').checked = config.notify_on_error !== 'false';
                 
                 // 加载删种配置
                 document.getElementById('config-remove-interval').value = config.auto_remove_interval || '60';
@@ -3908,34 +4544,22 @@
         async function showRemoveRecords() {
             try {
                 const records = await api('/remove_engine/records?limit=50');
+                window.removeRecordsCache = records;
                 
-                let html = '<div style="max-height: 400px; overflow-y: auto;">';
-                
-                if (records.length === 0) {
-                    html += '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">暂无删种记录</div>';
-                } else {
-                    html += '<table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">';
-                    html += '<thead><tr style="border-bottom: 1px solid var(--border-color);">';
-                    html += '<th style="text-align: left; padding: 0.5rem;">时间</th>';
-                    html += '<th style="text-align: left; padding: 0.5rem;">种子</th>';
-                    html += '<th style="text-align: left; padding: 0.5rem;">规则</th>';
-                    html += '<th style="text-align: right; padding: 0.5rem;">大小</th>';
-                    html += '<th style="text-align: right; padding: 0.5rem;">分享率</th>';
-                    html += '</tr></thead><tbody>';
-                    
-                    records.forEach(r => {
-                        html += '<tr style="border-bottom: 1px solid var(--border-color);">';
-                        html += `<td style="padding: 0.5rem; color: var(--text-muted);">${r.time}</td>`;
-                        html += `<td style="padding: 0.5rem;" title="${r.name}">${r.name}</td>`;
-                        html += `<td style="padding: 0.5rem; color: var(--accent-yellow);">${r.rule}</td>`;
-                        html += `<td style="padding: 0.5rem; text-align: right;">${formatSize(r.size)}</td>`;
-                        html += `<td style="padding: 0.5rem; text-align: right;">${r.ratio.toFixed(2)}</td>`;
-                        html += '</tr>';
-                    });
-                    
-                    html += '</tbody></table>';
-                }
-                html += '</div>';
+                let html = `
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                        <input type="text" class="form-input" id="remove-records-keyword" placeholder="搜索种子/规则/原因">
+                        <select class="form-input" id="remove-records-rule">
+                            <option value="">全部规则</option>
+                        </select>
+                        <select class="form-input" id="remove-records-instance">
+                            <option value="">全部实例</option>
+                        </select>
+                        <button class="btn btn-secondary btn-sm" onclick="applyRemoveRecordsFilter()">筛选</button>
+                        <button class="btn btn-secondary btn-sm" onclick="exportRemoveRecordsCsv()">导出CSV</button>
+                    </div>
+                    <div id="remove-records-table" style="max-height: 400px; overflow-y: auto;"></div>
+                `;
                 
                 // 显示模态框
                 const modal = document.createElement('div');
@@ -3951,10 +4575,113 @@
                     </div>
                 `;
                 document.body.appendChild(modal);
+
+                populateRemoveRecordFilters(records);
+                applyRemoveRecordsFilter();
                 
             } catch (error) {
                 showToast('加载删种日志失败: ' + error.message, 'error');
             }
+        }
+
+        function populateRemoveRecordFilters(records) {
+            const ruleSelect = document.getElementById('remove-records-rule');
+            const instanceSelect = document.getElementById('remove-records-instance');
+            if (!ruleSelect || !instanceSelect) return;
+
+            const rules = Array.from(new Set(records.map(r => r.rule).filter(Boolean)));
+            const instances = Array.from(new Set(records.map(r => r.instance).filter(Boolean)));
+
+            ruleSelect.innerHTML = '<option value="">全部规则</option>' + rules.map(r => `<option value="${r}">${r}</option>`).join('');
+            instanceSelect.innerHTML = '<option value="">全部实例</option>' + instances.map(i => `<option value="${i}">${i}</option>`).join('');
+        }
+
+        function applyRemoveRecordsFilter() {
+            const records = window.removeRecordsCache || [];
+            const keyword = (document.getElementById('remove-records-keyword')?.value || '').trim().toLowerCase();
+            const ruleFilter = document.getElementById('remove-records-rule')?.value || '';
+            const instanceFilter = document.getElementById('remove-records-instance')?.value || '';
+
+            const filtered = records.filter(r => {
+                const matchKeyword = !keyword || [r.name, r.rule, r.reason, r.instance]
+                    .filter(Boolean)
+                    .some(field => field.toLowerCase().includes(keyword));
+                const matchRule = !ruleFilter || r.rule === ruleFilter;
+                const matchInstance = !instanceFilter || r.instance === instanceFilter;
+                return matchKeyword && matchRule && matchInstance;
+            });
+
+            renderRemoveRecordsTable(filtered);
+        }
+
+        function renderRemoveRecordsTable(records) {
+            const container = document.getElementById('remove-records-table');
+            if (!container) return;
+
+            if (records.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">暂无删种记录</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <th style="text-align: left; padding: 0.5rem;">时间</th>
+                            <th style="text-align: left; padding: 0.5rem;">种子</th>
+                            <th style="text-align: left; padding: 0.5rem;">实例</th>
+                            <th style="text-align: left; padding: 0.5rem;">规则</th>
+                            <th style="text-align: right; padding: 0.5rem;">大小</th>
+                            <th style="text-align: right; padding: 0.5rem;">分享率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${records.map(r => `
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <td style="padding: 0.5rem; color: var(--text-muted);">${r.time}</td>
+                                <td style="padding: 0.5rem;" title="${r.name}">${r.name}</td>
+                                <td style="padding: 0.5rem;">${r.instance || '-'}</td>
+                                <td style="padding: 0.5rem; color: var(--accent-yellow);">${r.rule}</td>
+                                <td style="padding: 0.5rem; text-align: right;">${formatSize(r.size)}</td>
+                                <td style="padding: 0.5rem; text-align: right;">${r.ratio.toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function exportRemoveRecordsCsv() {
+            const records = window.removeRecordsCache || [];
+            if (records.length === 0) {
+                showToast('暂无记录可导出', 'warning');
+                return;
+            }
+
+            const rows = [
+                ['时间', '种子', '实例', '规则', '原因', '大小', '上传量', '分享率'],
+                ...records.map(r => [
+                    r.time,
+                    r.name,
+                    r.instance || '',
+                    r.rule,
+                    r.reason || '',
+                    formatSize(r.size),
+                    formatSize(r.uploaded || 0),
+                    r.ratio?.toFixed(2) || '0.00'
+                ])
+            ];
+
+            const csvContent = rows.map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `remove-records-${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         }
 
         async function saveConfig(btnEl) {
@@ -3977,6 +4704,11 @@
                 rss_fetch_enabled: document.getElementById('config-rss-enabled').checked ? 'true' : 'false',
                 rss_fetch_interval: document.getElementById('config-rss-interval').value || '300',
                 rss_max_age_minutes: document.getElementById('config-rss-max-age').value || '60',
+                notify_on_startup: document.getElementById('config-notify-startup').checked ? 'true' : 'false',
+                notify_on_add: document.getElementById('config-notify-add').checked ? 'true' : 'false',
+                notify_on_remove: document.getElementById('config-notify-remove').checked ? 'true' : 'false',
+                notify_on_limit: document.getElementById('config-notify-limit').checked ? 'true' : 'false',
+                notify_on_error: document.getElementById('config-notify-error').checked ? 'true' : 'false',
             };
             
             // 带超时的API调用 - 缩短到5秒

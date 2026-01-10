@@ -11,7 +11,7 @@
 #   - systemd 服务管理
 #
 #   使用方法：
-#   bash <(curl -sL https://raw.githubusercontent.com/YOUR_USERNAME/qbit-smart-web/main/install.sh)
+#   bash <(curl -sL https://raw.githubusercontent.com/1336665/Qbit-Smart-Web/main/install.sh)
 #
 #===============================================================================
 
@@ -27,7 +27,8 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # 配置
-REPO_URL="https://github.com/1336665/qbit-smart-web"
+REPO_URL="https://github.com/1336665/Qbit-Smart-Web"
+REPO_RAW_URL="https://raw.githubusercontent.com/1336665/Qbit-Smart-Web/main"
 INSTALL_DIR="/opt/qbit-smart-web"
 SERVICE_NAME="qbit-smart"
 DEFAULT_PORT=5000
@@ -160,10 +161,14 @@ download_program() {
         wget -q "${REPO_URL}/archive/refs/heads/main.zip" -O qbit-smart-web-latest.zip
     }
     
-    unzip -q qbit-smart-web-latest.zip
+    rm -rf /tmp/qbit-smart-web-extract
+    unzip -q qbit-smart-web-latest.zip -d /tmp/qbit-smart-web-extract
     
     # 找到解压后的目录
-    EXTRACTED_DIR=$(find . -maxdepth 1 -type d -name "qbit-smart-web*" | head -1)
+    EXTRACTED_DIR=$(find /tmp/qbit-smart-web-extract -mindepth 1 -maxdepth 1 -type d | head -1)
+    if [ -z "$EXTRACTED_DIR" ]; then
+        EXTRACTED_DIR="/tmp/qbit-smart-web-extract"
+    fi
     
     if [ -z "$EXTRACTED_DIR" ]; then
         print_error "解压失败，找不到程序目录"
@@ -324,7 +329,7 @@ show_status() {
     echo -e "    日志: ${CYAN}journalctl -u ${SERVICE_NAME} -f${NC}"
     echo ""
     echo -e "  ${YELLOW}更新程序:${NC}"
-    echo -e "    ${CYAN}bash <(curl -sL ${REPO_URL}/raw/main/install.sh)${NC}"
+    echo -e "    ${CYAN}bash <(curl -sL ${REPO_RAW_URL}/install.sh)${NC}"
     echo ""
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
 }

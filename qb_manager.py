@@ -352,6 +352,39 @@ class QBManager:
             self.logger.error(f"设置限速失败: {e}")
             return False, str(e)
     
+
+    def set_download_limit(self, instance_id: int, torrent_hashes: Union[str, List[str]],
+                           limit: int) -> Tuple[bool, str]:
+        """设置种子下载限速（支持批量）
+
+        Args:
+            instance_id: qB实例ID
+            torrent_hashes: 种子hash或hash列表
+            limit: 限速值（字节/秒），-1表示无限制
+        """
+        client = self.get_client(instance_id)
+        if not client:
+            return False, "未连接"
+
+        try:
+            # 统一处理为字符串
+            if isinstance(torrent_hashes, list):
+                hashes = '|'.join(torrent_hashes)
+            else:
+                hashes = torrent_hashes
+
+            # -1 表示无限制，qB API需要设为0
+            actual_limit = 0 if limit == -1 else limit
+
+            client.torrents_set_download_limit(
+                torrent_hashes=hashes,
+                limit=actual_limit
+            )
+            return True, f"下载限速设置为 {limit} B/s"
+        except Exception as e:
+            self.logger.error(f"设置下载限速失败: {e}")
+            return False, str(e)
+
     def set_torrent_download_limit(self, instance_id: int, torrent_hash: str, 
                                     limit: int) -> Tuple[bool, str]:
         """设置种子下载限速"""
@@ -360,13 +393,30 @@ class QBManager:
             return False, "未连接"
         
         try:
+            actual_limit = 0 if limit == -1 else limit
             client.torrents_set_download_limit(
                 torrent_hashes=torrent_hash, 
-                limit=limit
+                limit=actual_limit
             )
             return True, f"限速设置为 {limit} B/s"
         except Exception as e:
             return False, str(e)
+
+    def get_torrent_info_by_hash(self, torrent_hash: str) -> Optional[Dict]:
+        """通过hash获取种子信息"""
+        # 旧版本误用 self._clients（不存在），会导致状态面板/限速引擎无法通过hash反查种子。
+        # 这里统一从已连接的实例列表中遍历查询。
+        for inst in self.get_connected_instances():
+            client = inst.client
+            if not client:
+                continue
+            try:
+                torrents = client.torrents_info(hashes=torrent_hash)
+                if torrents:
+                    return dict(torrents[0])
+            except Exception:
+                continue
+        return None
     
     def get_torrent_trackers(self, instance_id: int, torrent_hash: str) -> List[Dict]:
         """获取种子的tracker列表"""

@@ -553,9 +553,7 @@ class RSSEngine:
                     # 发送通知
                     if self.notifier:
                         try:
-                            self.notifier.notify(
-                                f"🆕 新种子添加\n站点: {site_name}\n名称: {item.title[:50]}\n实例: {instance['name']}"
-                            )
+                            self.notifier.notify_torrent_added(item.title, site_name)
                         except:
                             pass
                 else:

@@ -18,6 +18,30 @@ import sys
 import time
 import json
 import logging
+import threading
+import fcntl
+
+# --- helpers ---
+def _is_true(v):
+    """Parse DB config truthy strings consistently."""
+    if v is None:
+        return False
+    if isinstance(v, bool):
+        return v
+    s = str(v).strip().lower()
+    return s in {"1","true","yes","y","on"}
+
+_singleton_lock_fd = None
+def _acquire_singleton_lock(lock_path: str = "/tmp/qbit-smart-web.lock") -> bool:
+    """Ensure only one process starts background engines (for gunicorn multi-worker)."""
+    global _singleton_lock_fd
+    try:
+        fd = open(lock_path, "w")
+        fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _singleton_lock_fd = fd
+        return True
+    except Exception:
+        return False
 import secrets
 from datetime import datetime
 from functools import wraps
@@ -86,7 +110,8 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 86400 * 7  # 7天
 # 常量
 # ════════════════════════════════════════════════════════════════════════════════
 class C:
-    VERSION = "1.16.0"
+    # 与 README 标注版本对齐
+    VERSION = "1.18.0"
     APP_NAME = "qBit Smart Web Manager"
 
 
@@ -375,7 +400,7 @@ def api_dashboard():
             instances_data.append(inst_info)
         
         # 限速引擎状态 - 综合检查配置和运行状态
-        smart_limit_enabled = db.get_config('smart_limit_enabled') == 'true'
+        smart_limit_enabled = _is_true(db.get_config('smart_limit_enabled'))
         
         # 使用is_running()方法检查运行状态（更可靠）
         limit_running = False
@@ -395,10 +420,18 @@ def api_dashboard():
                     limit_engine = create_precision_limit_engine(
                         db, qb_manager, site_manager, notifier
                     )
+                    try:
+                        notifier.set_context(qb_manager=qb_manager, site_helper_manager=site_manager, limit_engine=limit_engine)
+                    except Exception:
+                        pass
                     logger.info(f"限速引擎实例创建完成: {limit_engine is not None}")
                 if limit_engine and not limit_engine.is_running():
                     limit_engine.start()
                     limit_running = True
+                    try:
+                        notifier.set_context(limit_engine=limit_engine)
+                    except Exception:
+                        pass
                     logger.info("限速引擎自动启动成功")
             except Exception as e:
                 logger.warning(f"限速引擎自动启动失败: {e}", exc_info=True)
@@ -414,7 +447,12 @@ def api_dashboard():
                 'total_removed': remove_engine.get_status().get('total_removed', 0) if remove_engine else 0
             },
             'instances': instances_data,
+            # 兼容旧前端：limit_paused 仍表示“引擎未运行/不可用”
             'limit_paused': not limit_running,
+            # 新增：实际“用户暂停限速”状态（Telegram /pause）
+            'limit_running': bool(limit_running),
+            'limit_user_paused': getattr(limit_engine, 'paused', False) if limit_engine else False,
+            'temp_target_kib': getattr(limit_engine, 'temp_target_kib', None) if limit_engine else None,
             'limit_enabled': smart_limit_enabled,
             'version': C.VERSION
         })
@@ -985,7 +1023,7 @@ def api_set_config():
         db.set_config(key, str(value))
 
     if 'smart_limit_enabled' in data:
-        enabled = str(data.get('smart_limit_enabled')).lower() == 'true'
+        enabled = _is_true(data.get('smart_limit_enabled'))
         if enabled:
             if not LIMIT_ENGINE_AVAILABLE:
                 db.add_log('ERROR', '限速引擎不可用，无法启动')
@@ -999,6 +1037,11 @@ def api_set_config():
                     )
                 if not limit_engine.is_running():
                     limit_engine.start()
+                # 注入上下文，确保 Telegram 命令可控制最新实例
+                try:
+                    notifier.set_context(limit_engine=limit_engine)
+                except Exception:
+                    pass
                 db.add_log('INFO', '限速引擎已启动')
             except Exception as e:
                 db.add_log('ERROR', f'限速引擎启动失败: {e}')
@@ -1195,8 +1238,9 @@ def api_get_logs():
     """获取日志"""
     limit = request.args.get('limit', 100, type=int)
     level = request.args.get('level')
+    category = request.args.get('category')
     
-    logs = db.get_logs(limit, level)
+    logs = db.get_logs(limit, level, category)
     return jsonify(logs)
 
 
@@ -1216,7 +1260,7 @@ def api_clear_logs():
 @login_required
 def api_rss_status():
     """获取RSS状态"""
-    enabled = db.get_config('rss_fetch_enabled') == 'true'
+    enabled = _is_true(db.get_config('rss_fetch_enabled'))
     interval = int(db.get_config('rss_fetch_interval') or 300)
     
     status = {
@@ -1591,6 +1635,14 @@ def api_limit_engine_status():
     })
 
 
+@app.route('/api/limit_engine/history', methods=['GET'])
+@login_required
+def api_limit_engine_history():
+    """获取限速历史记录"""
+    limit = request.args.get('limit', 50, type=int)
+    return jsonify(db.get_limit_history(limit))
+
+
 @app.route('/api/limit_engine/states', methods=['GET'])
 @login_required
 def api_limit_engine_states():
@@ -1620,6 +1672,26 @@ def api_limit_engine_state(hash):
         return jsonify(state)
     except Exception as e:
         logger.error(f"获取种子状态失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/limit_engine/samples/<hash>', methods=['GET'])
+@login_required
+def api_limit_engine_samples(hash):
+    """获取单个种子的速度样本（用于可视化）"""
+    if not limit_engine:
+        return jsonify({'error': '限速引擎未启动'}), 400
+
+    window = request.args.get('window', 300, type=int)
+    window = max(30, min(3600, window))
+
+    try:
+        samples = limit_engine.get_speed_samples(hash, window)
+        if samples is None:
+            return jsonify({'error': '未找到该种子的限速状态'}), 404
+        return jsonify(samples)
+    except Exception as e:
+        logger.error(f"获取速度样本失败: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -1668,7 +1740,7 @@ def api_remove_engine_status():
         return jsonify({
             'available': AUTO_REMOVE_AVAILABLE,
             'running': False,
-            'enabled': db.get_config('auto_remove_enabled') == 'true',
+            'enabled': _is_true(db.get_config('auto_remove_enabled')),
             'check_interval': int(db.get_config('auto_remove_interval') or 60),
             'sleep_between': int(db.get_config('auto_remove_sleep') or 5),
             'total_removed': 0
@@ -1791,6 +1863,12 @@ def init_app():
     site_manager = get_site_helper_manager()
     if site_manager:
         logger.info('站点辅助器已初始化')
+
+    # 注入运行上下文（供 Telegram 双向命令使用）
+    try:
+        notifier.set_context(qb_manager=qb_manager, site_helper_manager=site_manager)
+    except Exception:
+        pass
     
     # 连接已保存的qB实例
     instances = db.get_qb_instances()
@@ -1805,16 +1883,20 @@ def init_app():
                 db.add_log('WARNING', f"连接失败: {inst['name']} - {msg}")
     
     # 启动限速引擎
-    if LIMIT_ENGINE_AVAILABLE and db.get_config('smart_limit_enabled') == 'true':
+    if LIMIT_ENGINE_AVAILABLE and _is_true(db.get_config('smart_limit_enabled')):
         limit_engine = create_precision_limit_engine(
             db, qb_manager, site_manager, notifier
         )
         limit_engine.start()
+        try:
+            notifier.set_context(limit_engine=limit_engine)
+        except Exception:
+            pass
         logger.info('限速引擎已启动')
         db.add_log('INFO', '限速引擎已启动')
     
     # 启动RSS引擎
-    if RSS_ENGINE_AVAILABLE and db.get_config('rss_fetch_enabled') == 'true':
+    if RSS_ENGINE_AVAILABLE and _is_true(db.get_config('rss_fetch_enabled')):
         try:
             rss_engine = RSSEngine(db, qb_manager)
             rss_engine.start()
@@ -1824,7 +1906,7 @@ def init_app():
             logger.error(f'RSS引擎启动失败: {e}')
     
     # 启动自动删种引擎
-    if AUTO_REMOVE_AVAILABLE and db.get_config('auto_remove_enabled') == 'true':
+    if AUTO_REMOVE_AVAILABLE and _is_true(db.get_config('auto_remove_enabled')):
         try:
             remove_engine = create_auto_remove_engine(db, qb_manager, notifier)
             remove_engine.start()
@@ -1837,6 +1919,18 @@ def init_app():
     logger.info(f"{C.APP_NAME} v{C.VERSION} 启动完成")
 
 
+
+# --- WSGI/Service auto init ---
+# When running under gunicorn/uwsgi (imported module), __main__ is not executed.
+# We start background engines exactly once using a file lock.
+try:
+    if os.environ.get("QBIT_SMART_AUTO_INIT", "1") == "1":
+        if _acquire_singleton_lock():
+            init_app()
+        else:
+            logger.info("检测到多进程/多实例运行，跳过后台引擎启动（已由其他进程持有锁）")
+except Exception as e:
+    logger.error(f"自动初始化失败: {e}", exc_info=True)
 # ════════════════════════════════════════════════════════════════════════════════
 # 主入口
 # ════════════════════════════════════════════════════════════════════════════════
